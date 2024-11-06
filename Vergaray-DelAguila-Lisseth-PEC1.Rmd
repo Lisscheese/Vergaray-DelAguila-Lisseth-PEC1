@@ -1,5 +1,5 @@
 ---
-title: "MÁSTER UNIVERSITARIO EN BIOINFORMÁTICA Y BIOESTADÍSTICA1 - Análisis de Datos Ómicos PEC1"
+title: "MÁSTER UNIVERSITARIO EN BIOINFORMÁTICA Y BIOESTADÍSTICA1"
 author: "Lisseth Vergaray Del Aguila"
 date: "`r Sys.Date()`"
 output:
@@ -12,7 +12,7 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, encoding = "UTF-8",error = FALSE)
+knitr::opts_chunk$set(echo = TRUE)
 
 # Librerías usadas en la realización de este informe
 library(tinytex)
@@ -24,7 +24,11 @@ library(ggplot2)
 library(reshape2)
 library(corrplot)
 library(pheatmap)
+
 ```
+
+
+
 \begin{center}
 \color{green}
 Análisis de Datos Ómicos PEC1
@@ -35,8 +39,7 @@ Análisis de Datos Ómicos PEC1
 
 ## Objetivo
 
-El objetivo de la práctica es realizar el análisis de un conjunto de datos de metabolómica siguiendo un workflow de trabajo bioinformático estándar. Este análisis debe incluir la selección y descarga de datos en repositorios especializados hasta la organización, exploración y presentación de los mismos en un repositorio que será accesible en GitHub.
-
+El objetivo de este estudio es analizar el perfil metabólico de diferentes muestras para identificar patrones específicos de metabolitos que podrían estar asociados a distintos estados biológicos. Utilizando herramientas de análisis de datos ómicos como la normalización logarítmica, el análisis de componentes principales (PCA) y el agrupamiento jerárquico (heatmap), se pretendía explorar si existen subgrupos definidos en las muestras que puedan reflejar diferencias en los perfiles metabólicos entre las condiciones estudiadas.
 
 ## Selección de Datos
 
@@ -112,7 +115,7 @@ Esto proporciona una coherencia en el análisis pues se asegura que los datos. C
 \color{black}
 Para poder construir el objeto deberemos extraer la información, cogeremos los datos de la sheet Data para construir la matriz de datos y los datos de la sheet Peak para construir la matriz de metadatos.
 
-Matriz de datos principal (data_matrix): Contiene los datos de expresión con 149 metabolitos medidos (variables) en las filas y 140 muestras en las columnas. Obtenemos esta matriz extrayendo todas las filas y las columnas 5 a 153 (que corresponden a los metabolitos M1-M149) de main_data. Luego, transponemos esta matriz para que los metabolitos queden en las filas y las muestras en las columnas.
+Matriz de datos principal (data_sheet): Contiene los datos de expresión con 149 metabolitos medidos (variables) en las filas y 140 muestras en las columnas. Obtenemos esta matriz extrayendo todas las filas y las columnas 5 a 153 (que corresponden a los metabolitos M1-M149) de main_data. Luego, transponemos esta matriz para que los metabolitos queden en las filas y las muestras en las columnas.
 
 Información de las columnas: Proporciona metadatos sobre las muestras, como tipo de muestra o clase.
 
@@ -157,6 +160,7 @@ col_data
 \color{blue}
 ### Creación del Objeto SummarizedExperiment
 \color{black}
+
 Ahora procedemos a la creación de nuestro objeto, como se puede ver, se ha construido correctamente
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
@@ -301,6 +305,7 @@ hist(assay(rse_final, "normalized_counts"),
 # Restablecer la configuración de gráficos a una única gráfica
 par(mfrow = c(1, 1))
 ```
+
 La comparación de los dos histogramas muestra claramente que la normalización logarítmica ha mejorado la distribución de los datos de metabolitos, haciéndolos mucho más adecuados para el análisis estadístico y visualización.
 
 
@@ -331,7 +336,7 @@ pca_data$Condition <- colData(rse_final)$Class
 # Graficamos PCA
 ggplot(pca_data, aes(x = PC1, y = PC2, color = Condition)) +
   geom_point(size = 3) +
-  labs(title = "Análisis de Componentes Principales (PCA)",
+  labs(title = "Análisis PCA",
        x = "PC1", y = "PC2") +
   theme_classic()
 
@@ -347,6 +352,7 @@ No hay una separación clara entre las condiciones BN, GC, y HE, lo que sugiere 
 \color{black}
 
 Exploremos las relaciones entre metabolitos mediante un gráfico de correlación. Esto es útil para observar posibles agrupaciones o relaciones que puedan existir entre diferentes metabolitos.
+
 ```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
 # Graficamos el heatmap  
 pheatmap(assay(rse_final, "normalized_counts"),
@@ -358,6 +364,7 @@ pheatmap(assay(rse_final, "normalized_counts"),
 
 
 ```
+
 El agrupamiento de ciertos metabolitos también indica posibles conjuntos de metabolitos con comportamientos similares.
 
 ## Resumen Final
@@ -367,6 +374,11 @@ Este estudio demuestra cómo los análisis de datos metabolómicos pueden propor
 ## Repositorio GitHub
 
 <https://github.com/Lisscheese/Vergaray-DelAguila-Lisseth-PEC1>
+
+## Codigo R
+```{r echo=TRUE}
+purl("Vergaray-DelAguila-Lisseth-PEC1.Rmd", output = "Vergaray-DelAguila-Lisseth-PEC1.R")
+```
 
 
 ## Referencias

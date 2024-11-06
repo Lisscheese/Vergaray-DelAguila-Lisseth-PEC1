@@ -1,5 +1,5 @@
 ## ----setup, include=FALSE----------------------------------------------------------------------------------------------------------------------------
-knitr::opts_chunk$set(echo = TRUE, encoding = "UTF-8",error = FALSE)
+knitr::opts_chunk$set(echo = TRUE)
 
 # Librerías usadas en la realización de este informe
 library(tinytex)
@@ -11,6 +11,7 @@ library(ggplot2)
 library(reshape2)
 library(corrplot)
 library(pheatmap)
+
 
 
 ## ----echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE-------------------------------------------------------------------------------------
@@ -195,7 +196,7 @@ pca_data$Condition <- colData(rse_final)$Class
 # Graficamos PCA
 ggplot(pca_data, aes(x = PC1, y = PC2, color = Condition)) +
   geom_point(size = 3) +
-  labs(title = "Análisis de Componentes Principales (PCA)",
+  labs(title = "Análisis PCA",
        x = "PC1", y = "PC2") +
   theme_classic()
 
@@ -211,4 +212,8 @@ pheatmap(assay(rse_final, "normalized_counts"),
          color = colorRampPalette(c("beige", "orange", "red"))(50))
 
 
+
+
+## ----echo=TRUE---------------------------------------------------------------------------------------------------------------------------------------
+purl("Vergaray-DelAguila-Lisseth-PEC1.Rmd", output = "Vergaray-DelAguila-Lisseth-PEC1.R")
 
