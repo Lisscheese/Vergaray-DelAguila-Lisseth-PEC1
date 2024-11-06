@@ -1,0 +1,376 @@
+---
+title: "MÁSTER UNIVERSITARIO EN BIOINFORMÁTICA Y BIOESTADÍSTICA1 - Análisis de Datos Ómicos PEC1"
+author: "Lisseth Vergaray Del Aguila"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 4
+    number_sections: true
+    fig_caption: true
+    latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, encoding = "UTF-8",error = FALSE)
+
+# Librerías usadas en la realización de este informe
+library(tinytex)
+library(knitr)
+library(rmdformats)
+library(SummarizedExperiment)
+library(readxl)
+library(ggplot2)
+library(reshape2)
+library(corrplot)
+library(pheatmap)
+```
+\begin{center}
+\color{green}
+Análisis de Datos Ómicos PEC1
+\end{center}
+
+
+# Contenidos
+
+## Objetivo
+
+El objetivo de la práctica es realizar el análisis de un conjunto de datos de metabolómica siguiendo un workflow de trabajo bioinformático estándar. Este análisis debe incluir la selección y descarga de datos en repositorios especializados hasta la organización, exploración y presentación de los mismos en un repositorio que será accesible en GitHub.
+
+
+## Selección de Datos
+
+Se ha seleccionado el data set 2023-CIMCBTutorial, que está relacionado con un estudio de cáncer gástrico, publicado en el artículo Chan et al.(2016), in the British Journal of Cancer.
+
+Este estudio utiliza datos metabolómicos para analizar variaciones en el perfil metabólico de muestras, lo que es útil para entender como se ve afectado el meabolismo celular con el cáncer gástrico.
+
+Se utilizó la técnica 1H-RMN (Resonancia Magnética Nuclear) para adquirir los espectros de las muestras, y se pretende identificar patrones metabólicos característicos en tejidos o fluidos de pacientes con cáncer, pudiendo obtener así marcadores que podrían ser útiles en el diagnóstico o pronósitico del cáncer.
+
+
+## Descarga de Datos
+
+Procedemos a la descarga y leida de archivo para su manejo.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+
+url_dataset <- "https://raw.githubusercontent.com/nutrimetabolomics/metaboData/main/Datasets/2023-CIMCBTutorial/GastricCancer_NMR.xlsx"
+
+download.file(url_dataset, destfile = "GastricCancer_NMR.xlsx", mode = "wb")
+
+data <- read_excel("GastricCancer_NMR.xlsx")
+
+# Visualizamos las primeras filas
+head(data)
+```
+
+
+## Descripción del Dataset
+
+Este dataset incluye datos de concentración de metabolitos obtenidos mediante técnicas de espectrometría en diversas muestras. Los datos están organizados de la siguiente manera:
+
+Columnas de las Muestras:
+
+SampleID: Identificador único de cada muestra.
+
+SampleType: Tipo de muestra, que puede ser "QC" para control de calidad o "Sample" para las muestras de análisis.
+
+Class: Condición o grupo al que pertenece cada muestra. Las abreviaciones usadas incluyen:BN, GC, HE, QC
+
+
+Metabolitos: 
+
+Los metabolitos están organizados en columnas (M1, M2, ..., M149) en la hoja de datos, y representan diferentes compuestos metabolómicos medidos en cada muestra.
+
+Perc_missing: Porcentaje de valores faltantes para cada metabolito, lo que da una idea de la calidad de los datos para cada uno.
+
+QC_RSD: Desviación estándar relativa en las muestras de control de calidad, que indica la variabilidad de cada metabolito en estas muestras y es un indicador de su consistencia.
+
+## Creación del Contenedor SummarizedExperiment
+
+El *SummarizedExperiment* es una clase de objeto en R que nos permite almacenar y manejar datos ómicos de manera estructurada. Esta clase es ampliamente utilizada en análisis de datos de alto rendimiento, como los de genómica, proteómica y metabolómica, esta clase nos permite integrar tanto los datos cuantitativos como la información descriptiva de las muestras y las características en este caso los metabolitos. La clase fue diseñada para simplificar la manipulación y el análisis de estos datos, facilitando el trabajo con múltiples matrices de datos y metadatos.
+
+Es útil porque nos ofrece una estructura integrada, combinando en un solo contenedor, la matriz de los datos y los metadatos de las filas y columnas. Al tener los datos y metadatos organizados en un solo contenedor, SummarizedExperiment permite realizar análisis de manera eficiente, pues se pueden acceder fácilmente a todas las muestras de un grupo experimental específico o a todas las concentraciones de un metabolito en particular sin necesidad de buscar en varias tablas.
+
+También nos ofrece el poder trabajar con otros paquetes y herramientas bioninformáticas en R que están hechos para trabajar con este objeto.
+
+```{r message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
+# Instalamos SummarizedExperiment
+if (!requireNamespace("BiocManager", quietly = TRUE)) {
+  install.packages("BiocManager")
+}
+BiocManager::install("SummarizedExperiment")
+```
+\color{blue}
+### Funcionamiento de SummarizedExperiment?
+\color{black}
+SummarizedExperiment organiza estos elementos de una manera que facilita su manipulación y análisis.Si queremos acceder a la matriz de datos principal se hace a través de assay(rse), o a los metadatos de filas rowData(rse), y finalmente a los metadatos de la columna con colData(rse).
+
+Esto proporciona una coherencia en el análisis pues se asegura que los datos. Con todas estas características en su funcionamiento se pueden aplicar métodos estadísticos y visualización de gráficos basados en los datos.
+
+\color{blue}
+### Preparación de la matrices de datos y los metadatos
+\color{black}
+Para poder construir el objeto deberemos extraer la información, cogeremos los datos de la sheet Data para construir la matriz de datos y los datos de la sheet Peak para construir la matriz de metadatos.
+
+Matriz de datos principal (data_matrix): Contiene los datos de expresión con 149 metabolitos medidos (variables) en las filas y 140 muestras en las columnas. Obtenemos esta matriz extrayendo todas las filas y las columnas 5 a 153 (que corresponden a los metabolitos M1-M149) de main_data. Luego, transponemos esta matriz para que los metabolitos queden en las filas y las muestras en las columnas.
+
+Información de las columnas: Proporciona metadatos sobre las muestras, como tipo de muestra o clase.
+
+Información de las filas: Contiene metadatos sobre las variables medidas, en este caso, los metabolitos.
+
+Este enfoque nos permite estructurar los datos adecuadamente para utilizarlos en el objeto SummarizedExperiment, facilitando posteriores análisis bioinformáticos.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+
+# Leeremos cada sheet del data set por separado
+data_sheet <- read_excel("GastricCancer_NMR.xlsx", sheet = "Data")
+peak_sheet <- read_excel("GastricCancer_NMR.xlsx", sheet = "Peak")
+
+# Construimos la matriz que contendra los valores de los metabolitos
+metabolite_data <- as.matrix(data_sheet[, grep("^M", names(data_sheet))]) 
+
+# Contruimos los row names y col names de ambas sheets
+rownames(metabolite_data) <- data_sheet$SampleID  
+colnames(metabolite_data) <- peak_sheet$Name      
+
+# Creamos la matrix traspuesta
+metabolite_data <- t(metabolite_data)
+
+# Construimos los datos de las columnas
+row_data <- DataFrame(
+  Label = peak_sheet$Label,
+  Perc_missing = peak_sheet$Perc_missing,
+  QC_RSD = peak_sheet$QC_RSD,
+  row.names = peak_sheet$Name
+)
+row_data
+
+# Construimos los datos de las filas
+col_data <- DataFrame(
+  SampleType = data_sheet$SampleType,
+  Class = data_sheet$Class,
+  row.names = data_sheet$SampleID
+)
+col_data
+
+```
+\color{blue}
+### Creación del Objeto SummarizedExperiment
+\color{black}
+Ahora procedemos a la creación de nuestro objeto, como se puede ver, se ha construido correctamente
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+
+# Construimos el objeto
+rse <- SummarizedExperiment(
+  assays = list(counts = metabolite_data),
+  rowData = row_data,
+  colData = col_data
+)
+```
+Es es el resultado de construir nuestro objeto, junto con otros datos que ahora son fáciles de extraer.
+```{r}
+# Mostramos el obejto y los metadatos del mismo.
+rse
+dim(rse)
+head(assay(rse),1)
+
+```
+\color{blue}
+### Añadiendo metadata del dataset al objeto SummarizedExperiment
+\color{black}
+Con la información proporcionada en el repositorio del dataset podemos añadir los metadatos a nuestro objeto. Creamos una lista almacenando la información mostrada en description.md.
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+
+url_description <- "https://raw.githubusercontent.com/nutrimetabolomics/metaboData/main/Datasets/2023-CIMCBTutorial/description.md"
+download.file(url_description, destfile = "description.md", mode = "wb")
+
+# Leer el contenido (opcional)
+contenido <- readLines("description.md")
+
+
+dataset_description <- list(
+  content = contenido,
+  title = "1H-NMR urinary metabolomic profiling for diagnosis of gastric cancer",
+  description = "Data from a gastric cancer study in article Chan et al. (2016), in the British Journal of Cancer",
+  project_DOI = "ID del proyecto PR000699.",
+  pub_year = "2016"
+)
+# Agregar esta información a los metadatos del objeto SummarizedExperiment
+metadata(rse) <- dataset_description
+
+# Verificar los metadatos
+metadata(rse)
+```
+
+## Limpieza y normalización de los datos
+\color{blue}
+### Descartar NAs
+\color{black}
+Los datos metabolómicos contienen valores faltantes. Es importante decidir cómo manejarlos, en el tutorial seguido se toma como umbral el 20%, por lo tanto descartaremos los metabolitos que superen este umbral.
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+# Filtramos los metabolitos con Perc_missing <= 20
+filtered_indices <- which(rowData(rse)$Perc_missing <= 20)
+
+# Creamps un nuevo objeto SummarizedExperiment con el filtrado aplicado
+rse_filtered <- rse[filtered_indices, ]
+
+# Verificamos la estructura del nuevo objeto
+rse_filtered
+
+
+```
+Se puede confirmar que se han eliminado 9 filas que no cumplían con el umbral establecido.
+
+\color{blue}
+### Descartar metabolitos cuyo QC_RSD sea alto
+\color{black}
+
+A continuación, descartaremos aquellos metabolitos que presenten una puntuación de calidad (QC_RSD) superior a 20. Este criterio se basa en que la puntuación QC_RSD, que representa la desviación estándar relativa, indica qué tan lejos están los valores del metabolito con respecto a la media. Un valor alto de QC_RSD sugiere una mayor variabilidad, lo que podría afectar la fiabilidad de los datos para ese metabolito.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+
+# Aplicamos filtro para QC_RSD
+final_filtered_indices <- which(rowData(rse_filtered)$QC_RSD <= 20)
+
+# Creamos un nuevo objeto SummarizedExperiment con ambos filtros aplicados
+rse_final <- rse_filtered[final_filtered_indices, ]
+
+# Verificamos la estructura del nuevo objeto filtrado
+rse_final
+
+```
+52 filas (metabolitos) y 140 columnas (muestras), lo que indica que solo los metabolitos que cumplieron con ambos criterios (Perc_missing <= 20 y QC_RSD <= 20) permanecen en el dataset.
+
+\color{blue}
+### Normalización de los datos
+\color{black}
+
+Es común que los datos presenten variaciones significativas en las concentraciones de metabolitos debido a factores técnicos y biológicos. Estas variaciones pueden surgir de diferencias en el procesamiento de muestras, la sensibilidad de los instrumentos y la amplitud de los valores de concentración entre distintos metabolitos. Sin una normalización adecuada, estas variaciones pueden introducir sesgos y dificultar la interpretación de los resultados, afectando la comparación entre muestras y metabolitos.
+
+Utilizaremos la transformación Logarítmica para reducir la dispersión y manejar datos con rangos amplios de valores. Esto es particularmente útil cuando existen metabolitos con concentraciones muy dispares.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+# Guardamos la matriz de ultimo objetivo SummarizedExperiment 
+data_matrix <- assay(rse_final, "counts")
+
+# Aplicamos transformación logarítmica
+metabolite_data_log <- log2(data_matrix + 1)
+
+# Guardamos la matriz normalizada en el objeto SummarizedExperiment
+assay(rse_final, "normalized_counts") <- metabolite_data_log
+
+rse_final
+
+```
+\color{blue}
+### Guardando Contenedor
+\color{black}
+Una vez tenemos el objeto final (rse_final) generamos nuestro contenedor.
+```{r}
+# Guardar el objeto SummarizedExperiment en un archivo .Rda
+save(rse_final, file = "datos_metabolomica.Rda")
+```
+
+Tenemos ahora nuestro objeto con dos assays, uno sin normalizar y otro normalizado, se puede continuar con el análisis, ya que ahora tendremos únicamente en los metabolitos de alta calidad según los criterios estándar.
+
+## Análisis de los datos
+
+Una vez los datos están limpios y normalizado podemos realizar un análisis básico, empezamos por comparar los datos sin normalizar con los normalizados.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+par(mfrow = c(1, 2))
+
+# Histograma de los datos originales (counts)
+hist(assay(rse_final, "counts"), 
+     main = "Distribución Metabolitos", 
+     xlab = "Concentración (counts)", 
+     ylab = "Frecuencia", 
+     col = "purple", 
+     breaks = 20)
+
+
+# Histograma de los datos transformados logarítmicamente (log2)
+hist(assay(rse_final, "normalized_counts"), 
+     main = "Distribución Metabolitos (Normalized)", 
+     xlab = "Concentración (log2)", 
+     ylab = "Frecuencia", 
+     col = "pink", 
+     breaks = 20)
+
+# Restablecer la configuración de gráficos a una única gráfica
+par(mfrow = c(1, 1))
+```
+La comparación de los dos histogramas muestra claramente que la normalización logarítmica ha mejorado la distribución de los datos de metabolitos, haciéndolos mucho más adecuados para el análisis estadístico y visualización.
+
+
+En el histograma de la izquierda, los datos originales muestran una gran concentración de valores en el extremo izquierdo del gráfico, con unos pocos valores extremadamente altos. Esta distribución sesgada sugiere que algunos metabolitos presentan concentraciones muy elevadas en comparación con otros, lo que genera un rango amplio y una distribución altamente asimétrica. Este tipo de distribución dificulta el análisis y puede influir negativamente en las comparaciones estadísticas, ya que los valores extremos pueden tener un efecto desproporcionado.
+
+Tras la normalización logarítmica, la distribución de los datos en el histograma de la derecha es mucho más simétrica y se asemeja a una distribución normal, con la mayoría de los valores concentrados en un rango manejable.
+
+\color{blue}
+###  Análisis de Componentes Principales (PCA)
+\color{black}
+
+El PCA es muy útil para reducir la dimensionalidad y observar patrones generales, como si las muestras se agrupan por condición. 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+sum(is.na(assay(rse_final, "normalized_counts")))
+
+# Eliminamos filas con NAs
+data_matrix_clean <- assay(rse_final, "normalized_counts")[complete.cases(assay(rse_final, "normalized_counts")), ]
+
+
+# Realizamos PCA 
+pca <- prcomp(t(data_matrix_clean), scale. = TRUE)
+
+
+pca_data <- as.data.frame(pca$x)
+pca_data$Condition <- colData(rse_final)$Class
+
+# Graficamos PCA
+ggplot(pca_data, aes(x = PC1, y = PC2, color = Condition)) +
+  geom_point(size = 3) +
+  labs(title = "Análisis de Componentes Principales (PCA)",
+       x = "PC1", y = "PC2") +
+  theme_classic()
+
+```
+Observamos que los puntos morados (QC) están muy agrupados en la parte superior, lo que indica que las muestras de control de calidad (QC) son consistentes entre sí, esto sugiere que el control de calidad fue exitoso y que las medidas son reproducibles para estas muestras.
+
+Las otras condiciones están más dispersas, lo que sugiere una mayor variabilidad metabólica entre las muestras en esas condiciones.
+
+No hay una separación clara entre las condiciones BN, GC, y HE, lo que sugiere que sus perfiles metabólicos son similares en general o que las diferencias entre estos grupos no son suficientemente grandes como para que el PCA los separe claramente en el espacio de PC1 y PC2.
+
+\color{blue}
+### Clustered Heatmap de Metabolitos
+\color{black}
+
+Exploremos las relaciones entre metabolitos mediante un gráfico de correlación. Esto es útil para observar posibles agrupaciones o relaciones que puedan existir entre diferentes metabolitos.
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+# Graficamos el heatmap  
+pheatmap(assay(rse_final, "normalized_counts"),
+         scale = "row", 
+         cluster_rows = TRUE, 
+         cluster_cols = TRUE,
+         main = "Heatmap de Metabolitos Normalizados",
+         color = colorRampPalette(c("beige", "orange", "red"))(50))
+
+
+```
+El agrupamiento de ciertos metabolitos también indica posibles conjuntos de metabolitos con comportamientos similares.
+
+## Resumen Final
+
+Este estudio demuestra cómo los análisis de datos metabolómicos pueden proporcionar información valiosa sobre los perfiles metabólicos y las relaciones entre distintas condiciones experimentales. Los resultados obtenidos sugieren la existencia de patrones metabólicos consistentes en los controles de calidad y posibles subgrupos entre las muestras de distintas condiciones. Sin embargo, se requiere un análisis adicional para identificar de manera concluyente los metabolitos que podrían actuar como biomarcadores diferenciadores entre los estados de interés.
+
+## Repositorio GitHub
+
+<https://github.com/Lisscheese/Vergaray-DelAguila-Lisseth-PEC1>
+
+
+## Referencias
+
+1. SummarizedExperiment Manual. Disponible en: [http://new.bioconductor.org/packages/release/bioc/manuals/SummarizedExperiment/man/SummarizedExperiment.pdf](http://new.bioconductor.org/packages/release/bioc/manuals/SummarizedExperiment/man/SummarizedExperiment.pdf).
+
+2. Tutorial de flujo de trabajo para metabolómica (MetabWorkflowTutorial). Disponible en: [https://cimcb.github.io/MetabWorkflowTutorial/Tutorial1.html](https://cimcb.github.io/MetabWorkflowTutorial/Tutorial1.html).
