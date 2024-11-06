@@ -4,14 +4,14 @@ Este repositorio contiene los archivos y el código necesarios para el análisis
 
 ## Estructura del Proyecto
 
-- **Informe**: El documento PDF con el informe final (`informe_PEC1.pdf`), que describe cada paso del análisis, incluyendo la selección del dataset, creación del contenedor `SummarizedExperiment`, exploración de datos, y las conclusiones.
+- **Informe**: El documento PDF con el informe final (`Vergara-DelAguila-Lisseth-PEC1.pdf`), que describe cada paso del análisis, incluyendo la selección del dataset, creación del contenedor `SummarizedExperiment`, exploración de datos, y las conclusiones.
 - **Datos**:
   - `GastricCancer_NMR.xlsx`: Archivo con los datos originales descargados.
   - `description.md`: Archivo Markdown que con detalles del dataset.
 - **Código R**:
   - `Vergaray-DelAguila-Lisseth-PEC1.R`: Script en R que contiene el código utilizado para cargar, explorar, y analizar el dataset.
 - **Contenedor SummarizedExperiment**:
-  - `summarized_experiment.Rda`: Objeto `SummarizedExperiment` en formato `.Rda`, que contiene los datos y metadatos en una estructura integrada.
+  - `datos_metabolomica.Rda`: Objeto `SummarizedExperiment` en formato `.Rda`, que contiene los datos y metadatos en una estructura integrada.
 
 ## Descripción del Análisis
 
